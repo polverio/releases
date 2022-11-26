@@ -23,9 +23,9 @@ export KUBERNETES_RELEASE_VERSION="$(curl -vs https://github.com/kubernetes/rele
 if [ "$KUBERNETES_RELEASE_VERSION" = "" ]; then export KUBERNETES_RELEASE_VERSION="0.1.4"; fi
 
 CILIUM_VERSION="$(curl -vs https://github.com/cilium/cilium/releases/latest 2>&1 >/dev/null | grep -i '< Location:' | awk '{ print $3 }' | sed 's/https:\/\/github.com\/cilium\/cilium\/releases\/tag\/v//g' | sed 's/\r//g')"
-if [ "$CILIUM_VERSION" = "" ]; then export CILIUM_VERSION="1.12.3"; fi
+if [ "$CILIUM_VERSION" = "" ]; then export CILIUM_VERSION="1.12.4"; fi
 
-export ETH0IP4="$(ip -o -4 a | awk '$2 == "eth0" { print $4 }')"
+export ETH0IP4="$(ip -o -4 a | awk '$2 == "eth0" { print $4 }' | sed 's/\/[0-9]*//g')"
 
 # Install system prerequisites and configure required external repositories
 sudo tdnf install vim ethtool ebtables socat conntrack-tools apparmor-utils helm -y
@@ -60,14 +60,14 @@ overlay
 br_netfilter
 EOF
 
-## Configure required sysctl to persist across system reboots
+# ## Configure required sysctl to persist across system reboots
 cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
-net.bridge.bridge-nf-call-iptables = 1
 net.ipv4.ip_forward = 1
-net.bridge.bridge-nf-call-ip6tables = 1
+# net.bridge.bridge-nf-call-iptables = 1
+# net.bridge.bridge-nf-call-ip6tables = 1
 EOF
 
-## Apply sysctl parameters without reboot to current running enviroment
+# ## Apply sysctl parameters without reboot to current running enviroment
 sudo sysctl --system
 
 ## Install ContainerD
@@ -85,8 +85,8 @@ curl -sSL "https://raw.githubusercontent.com/kubernetes/release/v$KUBERNETES_REL
 sudo systemctl enable --now kubelet
 
 # Configure iptables
-# sudo iptables -t nat -A POSTROUTING -m addrtype ! --dst-type local ! -d 10.1.0.0/24 -j MASQUERADE
-sudo iptables -A INPUT -p tcp -m state --state NEW --match multiport --dports 80,443,6443 -j ACCEPT
+sudo iptables -t nat -A POSTROUTING -m addrtype ! --dst-type local ! -d 10.1.0.0/24 -j MASQUERADE
+sudo iptables -A INPUT -p tcp -m state --state NEW --match multiport --dports 1:65535 -j ACCEPT
 
 cat <<EOF | sudo tee /tmp/kubeadm-init-config.yaml
 apiVersion: kubeadm.k8s.io/v1beta3
@@ -97,7 +97,15 @@ nodeRegistration:
     value: "true"
     effect: "NoExecute"
 localAPIEndpoint:
+  advertiseAddress: "$ETH0IP4"
   bindPort: 6443
+skipPhases:
+  - addon/kube-proxy
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+networking:
+  podSubnet: 10.244.0.0/24
 EOF
 
 # configure kubelet on first nodev
@@ -105,22 +113,46 @@ sudo kubeadm init --config=/tmp/kubeadm-init-config.yaml
 
 # Untaint the control plane nodes so that workload can run on the control plane
 export KUBECONFIG=/etc/kubernetes/admin.conf
-kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 
 # Install Cilium CNI
 helm repo add cilium https://helm.cilium.io/
 helm install cilium cilium/cilium --version $CILIUM_VERSION \
   --namespace kube-system \
-  --set nodeinit.enabled=true \
-  --set tunnel=disabled \
-  --set endpointRoutes.enabled=true \
+  --set nodeinit.enabled=false \
+  --set tunnel=vxlan \
   --set operator.replicas=1 \
   --set ipam.mode=cluster-pool \
   --set hostPort.enabled=true \
   --set nodePort.enabled=true \
-  --set externalIPs.enabled=true \
   --set ingressController.enabled=true \
-  --set ipv4NativeRoutingCIDR="$ETH0IP4"
+  --set egressGateway.enabled=true \
+  --set ipv4NativeRoutingCIDR="$ETH0IP4/24" \
+  --set containerRuntime.integration="containerd" \
+  --set kubeProxyReplacement="strict" \
+  --set k8sServiceHost="$ETH0IP4" \
+  --set k8sServicePort="6443" \
+  --set bpf.masquerade=true \
+  --set ipam.operator.clusterPoolIPv4PodCIDRList={"10.244.0.0/24"} \
+  --set hostFirewall.enabled=true \
+  --set ipv6.enabled=false \
+  --set ipv4.enabled=true \
+  --set securityContext.privileged=true
+
+cat <<EOF | sudo tee /tmp/cilium-policy.yaml
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-within-namespace"
+EOF
+
+# Install Cilium CLI
+CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/master/stable.txt)
+CLI_ARCH=amd64
+if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 
 # create a useful area for local disk storage
 mkdir -p /pv
@@ -128,6 +160,9 @@ chmod -R 777 /pv
 
 # make sure the KUBECONFIG works when you sudo -i bash 
 echo "export KUBECONFIG=/etc/kubernetes/admin.conf" >> /root/.bash_profile
+
+# attempt to scale down coredns
+kubectl scale deployment --replicas=1 coredns -n=kube-system
 
 popd
 rm -rf $TEMPDIR
