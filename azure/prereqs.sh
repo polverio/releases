@@ -28,7 +28,7 @@ if [ "$CILIUM_VERSION" = "" ]; then export CILIUM_VERSION="1.12.4"; fi
 export ETH0IP4="$(ip -o -4 a | awk '$2 == "eth0" { print $4 }' | sed 's/\/[0-9]*//g')"
 
 # Install system prerequisites and configure required external repositories
-sudo tdnf install vim ethtool ebtables socat conntrack-tools apparmor-utils helm -y
+sudo tdnf install vim ethtool ebtables socat conntrack-tools apparmor-utils helm jq -y
 
 curl -LO "https://dl.k8s.io/release/$KUBE_VERSION/bin/linux/$ARCHITECTURE/{kubectl,kubeadm,kubelet}"
 
@@ -85,7 +85,7 @@ curl -sSL "https://raw.githubusercontent.com/kubernetes/release/v$KUBERNETES_REL
 sudo systemctl enable --now kubelet
 
 # Configure iptables
-sudo iptables -t nat -A POSTROUTING -m addrtype ! --dst-type local ! -d 10.1.0.0/24 -j MASQUERADE
+sudo iptables -t nat -A POSTROUTING -m addrtype ! --dst-type local ! -d $ETH0IP4/24 -j MASQUERADE
 sudo iptables -A INPUT -p tcp -m state --state NEW --match multiport --dports 1:65535 -j ACCEPT
 
 cat <<EOF | sudo tee /tmp/kubeadm-init-config.yaml
@@ -119,7 +119,7 @@ helm repo add cilium https://helm.cilium.io/
 helm install cilium cilium/cilium --version $CILIUM_VERSION \
   --namespace kube-system \
   --set nodeinit.enabled=false \
-  --set tunnel=vxlan \
+  --set tunnel=disabled \
   --set operator.replicas=1 \
   --set ipam.mode=cluster-pool \
   --set hostPort.enabled=true \
@@ -133,10 +133,8 @@ helm install cilium cilium/cilium --version $CILIUM_VERSION \
   --set k8sServicePort="6443" \
   --set bpf.masquerade=true \
   --set ipam.operator.clusterPoolIPv4PodCIDRList={"10.244.0.0/24"} \
-  --set hostFirewall.enabled=true \
   --set ipv6.enabled=false \
-  --set ipv4.enabled=true \
-  --set securityContext.privileged=true
+  --set ipv4.enabled=true
 
 cat <<EOF | sudo tee /tmp/cilium-policy.yaml
 apiVersion: "cilium.io/v2"
@@ -145,14 +143,14 @@ metadata:
   name: "allow-within-namespace"
 EOF
 
-# Install Cilium CLI
-CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/master/stable.txt)
-CLI_ARCH=amd64
-if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
-curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
-sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
-sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
-rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+# # Install Cilium CLI
+# CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/master/stable.txt)
+# CLI_ARCH=amd64
+# if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+# curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+# sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+# sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+# rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 
 # create a useful area for local disk storage
 mkdir -p /pv

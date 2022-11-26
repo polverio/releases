@@ -22,8 +22,5 @@ EOF
 
 chmod 0755 /var/lib/cloud/scripts/per-instance/instance.sh
 
-curl https://raw.githubusercontent.com/polverio/releases/main/azure/setgoalstate.sh | sudo tee /var/lib/polverio/setgoalstate.sh
-bash /var/lib/polverio/setgoalstate.sh
-
 # generalize the image
-sudo waagent -deprovision+user --force
+# sudo waagent -deprovision+user --force
