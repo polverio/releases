@@ -123,6 +123,7 @@ helm install cilium cilium/cilium --version $CILIUM_VERSION \
   --set operator.replicas=1 \
   --set ipam.mode=cluster-pool \
   --set hostPort.enabled=true \
+  --set hostServices.enabled=true \
   --set nodePort.enabled=true \
   --set ingressController.enabled=true \
   --set egressGateway.enabled=true \
@@ -131,6 +132,7 @@ helm install cilium cilium/cilium --version $CILIUM_VERSION \
   --set kubeProxyReplacement="strict" \
   --set k8sServiceHost="$ETH0IP4" \
   --set k8sServicePort="6443" \
+  --set announce.loadbalancerIP=true \
   --set bpf.masquerade=true \
   --set ipam.operator.clusterPoolIPv4PodCIDRList={"10.244.0.0/24"} \
   --set ipv6.enabled=false \
@@ -155,6 +157,40 @@ EOF
 # create a useful area for local disk storage
 mkdir -p /pv
 chmod -R 777 /pv
+
+cat <<EOF | sudo tee /tmp/pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-data-local-1
+  labels:
+    type: local
+spec:
+  storageClassName:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/pv"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-data-local-2
+  labels:
+    type: local
+spec:
+  storageClassName:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/pv"
+EOF
+
+kubectl apply -f /tmp/pv.yaml
 
 # make sure the KUBECONFIG works when you sudo -i bash 
 echo "export KUBECONFIG=/etc/kubernetes/admin.conf" >> /root/.bash_profile
