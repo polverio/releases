@@ -63,8 +63,6 @@ EOF
 # ## Configure required sysctl to persist across system reboots
 cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
 net.ipv4.ip_forward = 1
-# net.bridge.bridge-nf-call-iptables = 1
-# net.bridge.bridge-nf-call-ip6tables = 1
 EOF
 
 # ## Apply sysctl parameters without reboot to current running enviroment
@@ -88,7 +86,7 @@ sudo systemctl enable --now kubelet
 sudo iptables -t nat -A POSTROUTING -m addrtype ! --dst-type local ! -d $ETH0IP4/24 -j MASQUERADE
 sudo iptables -A INPUT -p tcp -m state --state NEW --match multiport --dports 1:65535 -j ACCEPT
 
-cat <<EOF | sudo tee /tmp/kubeadm-init-config.yaml
+cat <<EOF | sudo tee $TEMPDIR/kubeadm-init-config.yaml
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: InitConfiguration
 nodeRegistration:
@@ -108,10 +106,9 @@ networking:
   podSubnet: 10.244.0.0/24
 EOF
 
-# configure kubelet on first nodev
-sudo kubeadm init --config=/tmp/kubeadm-init-config.yaml --ignore-preflight-errors=NumCPU,Mem
+# configure kubelet on first node
+sudo kubeadm init --config=$TEMPDIR/kubeadm-init-config.yaml --ignore-preflight-errors=NumCPU,Mem
 
-# Untaint the control plane nodes so that workload can run on the control plane
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
 # Install Cilium CNI
@@ -137,60 +134,6 @@ helm install cilium cilium/cilium --version $CILIUM_VERSION \
   --set ipam.operator.clusterPoolIPv4PodCIDRList={"10.244.0.0/24"} \
   --set ipv6.enabled=false \
   --set ipv4.enabled=true
-
-cat <<EOF | sudo tee /tmp/cilium-policy.yaml
-apiVersion: "cilium.io/v2"
-kind: CiliumNetworkPolicy
-metadata:
-  name: "allow-within-namespace"
-EOF
-
-# # Install Cilium CLI
-# CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/master/stable.txt)
-# CLI_ARCH=amd64
-# if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
-# curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
-# sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
-# sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
-# rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
-
-# create a useful area for local disk storage
-mkdir -p /pv
-chmod -R 777 /pv
-
-cat <<EOF | sudo tee /tmp/pv.yaml
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: pv-data-local-1
-  labels:
-    type: local
-spec:
-  storageClassName:
-  capacity:
-    storage: 20Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/pv"
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: pv-data-local-2
-  labels:
-    type: local
-spec:
-  storageClassName:
-  capacity:
-    storage: 20Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/pv"
-EOF
-
-kubectl apply -f /tmp/pv.yaml
 
 # make sure the KUBECONFIG works when you sudo -i bash 
 echo "export KUBECONFIG=/etc/kubernetes/admin.conf" >> /root/.bash_profile
