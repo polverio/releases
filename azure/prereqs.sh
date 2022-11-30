@@ -109,7 +109,7 @@ networking:
 EOF
 
 # configure kubelet on first nodev
-sudo kubeadm init --config=/tmp/kubeadm-init-config.yaml 
+sudo kubeadm init --config=/tmp/kubeadm-init-config.yaml --ignore-preflight-errors=NumCPU,Mem
 
 # Untaint the control plane nodes so that workload can run on the control plane
 export KUBECONFIG=/etc/kubernetes/admin.conf
