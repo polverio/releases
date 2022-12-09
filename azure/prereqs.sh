@@ -96,7 +96,7 @@ nodeRegistration:
     value: "true"
     effect: "NoExecute"
 localAPIEndpoint:
-  advertiseAddress: "$ETH0IP4"
+  advertiseAddress: $ETH0IP4
   bindPort: 6443
 skipPhases:
   - addon/kube-proxy
@@ -105,7 +105,7 @@ apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
 apiServer:
   certSANs:
-  - "$EXTERNALIP4"
+  - $EXTERNALIP4
 networking:
   podSubnet: 10.244.0.0/24
 EOF
