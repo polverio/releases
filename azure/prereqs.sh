@@ -108,7 +108,7 @@ networking:
 EOF
 
 # configure kubelet on first node
-sudo kubeadm init --config=$TEMPDIR/kubeadm-init-config.yaml --ignore-preflight-errors=NumCPU,Mem --apiserver-cert-extra-sans=$EXTERNALIP4
+sudo kubeadm init --config=$TEMPDIR/kubeadm-init-config.yaml --ignore-preflight-errors=NumCPU,Mem
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
