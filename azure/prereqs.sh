@@ -103,6 +103,9 @@ skipPhases:
 ---
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
+apiServer:
+  certSANs:
+  - "$EXTERNALIP4"
 networking:
   podSubnet: 10.244.0.0/24
 EOF
