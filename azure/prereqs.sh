@@ -29,7 +29,9 @@ CILIUM_VERSION="$(curl -vs https://github.com/cilium/cilium/releases/latest 2>&1
 if [ "$CILIUM_VERSION" = "" ]; then export CILIUM_VERSION="1.12.4"; fi
 
 export ETH0IP4="$(ip -o -4 a | awk '$2 == "eth0" { print $4 }' | sed 's/\/[0-9]*//g')"
-export EXTERNALIP4="$(curl -sL -H "metadata:true" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0?api-version=2020-09-01" | jq .publicIpAddress)"
+#export EXTERNALIP4="$(curl -sL -H "metadata:true" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0?api-version=2020-09-01" | jq .publicIpAddress)"
+
+export EXTERNALIP4="$(curl ifconfig.me)"
 
 curl -LO "https://dl.k8s.io/release/$KUBE_VERSION/bin/linux/$ARCHITECTURE/{kubectl,kubeadm,kubelet}"
 
