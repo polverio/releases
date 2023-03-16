@@ -35,11 +35,18 @@ export ETH0IP4="$(ip -o -4 a | awk '$2 == "eth0" { print $4 }' | sed 's/\/[0-9]*
 
 export EXTERNALIP4="$(curl ifconfig.me)"
 
-curl -LO "https://dl.k8s.io/release/$KUBE_VERSION/bin/linux/$ARCHITECTURE/{kubectl,kubeadm,kubelet}"
+# Format:
+# https://dl.k8s.io/v1.26.2/kubernetes-client-linux-amd64.tar.gz
 
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-sudo install -o root -g root -m 0755 kubeadm /usr/local/bin/kubeadm
-sudo install -o root -g root -m 0755 kubelet /usr/local/bin/kubelet
+curl -LO "https://dl.k8s.io/$KUBE_VERSION/kubernetes-client-linux-$ARCHITECTURE.tar.gz"
+curl -LO "https://dl.k8s.io/$KUBE_VERSION/kubernetes-server-linux-$ARCHITECTURE.tar.gz"
+
+tar xvfz "kubernetes-client-linux-$ARCHITECTURE.tar.gz" kubernetes/client/bin
+sudo install -o root -g root -m 0755 kubernetes/client/bin/kubectl /usr/local/bin/kubectl
+
+tar xvfz "kubernetes-server-linux-$ARCHITECTURE.tar.gz" kubernetes/server/bin
+sudo install -o root -g root -m 0755 kubernetes/server/bin/kubeadm /usr/local/bin/kubeadm
+sudo install -o root -g root -m 0755 kubernetes/server/bin/kubelet /usr/local/bin/kubelet
 
 # https://kubernetes.io/docs/setup/production-environment/container-runtimes/#containerd
 # https://github.com/containerd/containerd/blob/main/docs/getting-started.md
