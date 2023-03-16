@@ -4,13 +4,13 @@ export TEMPDIR=/tmp/polverio$$
 mkdir -p $TEMPDIR 
 pushd $TEMPDIR
 
-# Install system prerequisites and configure required external repositories
-sudo tdnf install vim ethtool ebtables socat conntrack-tools apparmor-utils helm jq -y
-
 export ARCHITECTURE="amd64"
 if [ "$(uname -m)" = "aarch64" ]; then export ARCHITECTURE="arm64"; fi
 
-export KUBE_VERSION="$(curl -L -s https://dl.k8s.io/release/stable.txt)"
+export KUBE_CHANNEL="$(curl -sL -H "metadata:true" "http://169.254.169.254/metadata/instance/compute/tagsList?api-version=2020-09-01" | jq '.[] | select(.name=="KUBE_CHANNEL").value' -r)"
+if [ "$KUBE_CHANNEL" = "" ]; then export KUBE_CHANNEL="stable"; fi
+
+export KUBE_VERSION="$(curl -L -s https://dl.k8s.io/release/$KUBE_CHANNEL.txt)"
 if [ "$KUBE_VERSION" = "" ]; then export KUBE_VERSION="v1.25.4"; fi
 
 export CONTAINERD_VERSION="$(curl -vs https://github.com/containerd/containerd/releases/latest 2>&1 >/dev/null | grep -i '< Location:' | awk '{ print $3 }' | sed 's/https:\/\/github.com\/containerd\/containerd\/releases\/tag\/v//g' | sed 's/\r//g')"
