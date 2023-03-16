@@ -4,6 +4,8 @@ export TEMPDIR=/tmp/polverio$$
 mkdir -p $TEMPDIR 
 pushd $TEMPDIR
 
+tdnf install -y jq
+
 export ARCHITECTURE="amd64"
 if [ "$(uname -m)" = "aarch64" ]; then export ARCHITECTURE="arm64"; fi
 
