@@ -111,11 +111,16 @@ skipPhases:
 ---
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
+kubernetesVersion: $KUBE_VERSION
 apiServer:
   certSANs:
   - $EXTERNALIP4
 networking:
   podSubnet: 10.244.0.0/24
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+cgroupDriver: systemd
 EOF
 
 # configure kubelet on first node
