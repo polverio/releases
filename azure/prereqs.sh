@@ -4,7 +4,7 @@ export TEMPDIR=/tmp/polverio$$
 mkdir -p $TEMPDIR 
 pushd $TEMPDIR
 
-tdnf install -y jq
+sudo tdnf install vim ethtool ebtables socat conntrack-tools apparmor-utils helm jq -y
 
 export ARCHITECTURE="amd64"
 if [ "$(uname -m)" = "aarch64" ]; then export ARCHITECTURE="arm64"; fi
@@ -38,13 +38,10 @@ export EXTERNALIP4="$(curl ifconfig.me)"
 # Format:
 # https://dl.k8s.io/v1.26.2/kubernetes-client-linux-amd64.tar.gz
 
-curl -LO "https://dl.k8s.io/$KUBE_VERSION/kubernetes-client-linux-$ARCHITECTURE.tar.gz"
 curl -LO "https://dl.k8s.io/$KUBE_VERSION/kubernetes-server-linux-$ARCHITECTURE.tar.gz"
-
-tar xvfz "kubernetes-client-linux-$ARCHITECTURE.tar.gz" kubernetes/client/bin
-sudo install -o root -g root -m 0755 kubernetes/client/bin/kubectl /usr/local/bin/kubectl
-
 tar xvfz "kubernetes-server-linux-$ARCHITECTURE.tar.gz" kubernetes/server/bin
+
+sudo install -o root -g root -m 0755 kubernetes/server/bin/kubectl /usr/local/bin/kubectl
 sudo install -o root -g root -m 0755 kubernetes/server/bin/kubeadm /usr/local/bin/kubeadm
 sudo install -o root -g root -m 0755 kubernetes/server/bin/kubelet /usr/local/bin/kubelet
 
@@ -122,7 +119,7 @@ networking:
 EOF
 
 # configure kubelet on first node
-sudo kubeadm init --config=$TEMPDIR/kubeadm-init-config.yaml --ignore-preflight-errors=NumCPU,Mem
+sudo kubeadm init --config=$TEMPDIR/kubeadm-init-config.yaml --ignore-preflight-errors=NumCPU,Mem,KubeletVersion --v=5
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
