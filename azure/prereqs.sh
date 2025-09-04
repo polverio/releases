@@ -1,7 +1,7 @@
-#!/bin/sh 
+#!/bin/sh
 
 export TEMPDIR=/tmp/polverio$$
-mkdir -p $TEMPDIR 
+mkdir -p $TEMPDIR
 pushd $TEMPDIR
 
 sudo tdnf install vim ethtool ebtables socat conntrack-tools apparmor-utils helm jq -y
@@ -25,7 +25,7 @@ export CRICTL_VERSION="$(curl -vs https://github.com/kubernetes-sigs/cri-tools/r
 if [ "$CRICTL_VERSION" = "" ]; then export CRICTL_VERSION="1.25.0"; fi
 
 export KUBERNETES_RELEASE_VERSION="$(curl -vs https://github.com/kubernetes/release/releases/latest 2>&1 >/dev/null | grep -i '< Location:' | awk '{ print $3 }' | sed 's/https:\/\/github.com\/kubernetes\/release\/releases\/tag\/v//g' | sed 's/\r//g')"
-if [ "$KUBERNETES_RELEASE_VERSION" = "" ]; then export KUBERNETES_RELEASE_VERSION="0.1.4"; fi
+if [ "$KUBERNETES_RELEASE_VERSION" = "" ]; then export KUBERNETES_RELEASE_VERSION="0.16.4"; fi
 
 CILIUM_VERSION="$(curl -vs https://github.com/cilium/cilium/releases/latest 2>&1 >/dev/null | grep -i '< Location:' | awk '{ print $3 }' | sed 's/https:\/\/github.com\/cilium\/cilium\/releases\/tag\/v//g' | sed 's/\r//g')"
 if [ "$CILIUM_VERSION" = "" ]; then export CILIUM_VERSION="1.12.4"; fi
@@ -85,9 +85,9 @@ sudo sed -i 's/            SystemdCgroup = false/            SystemdCgroup = tru
 sudo systemctl daemon-reload
 sudo systemctl enable --now containerd
 
-curl -sSL "https://raw.githubusercontent.com/kubernetes/release/v$KUBERNETES_RELEASE_VERSION/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service" | sed "s:/usr/bin:/usr/local/bin:g" | sudo tee /etc/systemd/system/kubelet.service
+curl -sSL "https://raw.githubusercontent.com/kubernetes/release/v$KUBERNETES_RELEASE_VERSION/cmd/krel/templates/latest/kubelet/kubelet.service" | sed "s:/usr/bin:/usr/local/bin:g" | sudo tee /etc/systemd/system/kubelet.service
 sudo mkdir -p /etc/systemd/system/kubelet.service.d
-curl -sSL "https://raw.githubusercontent.com/kubernetes/release/v$KUBERNETES_RELEASE_VERSION/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin:/usr/local/bin:g" | sudo tee /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+curl -sSL "https://raw.githubusercontent.com/kubernetes/release/v$KUBERNETES_RELEASE_VERSION/cmd/krel/templates/latest/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin:/usr/local/bin:g" | sudo tee /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
 sudo systemctl enable --now kubelet
 
@@ -152,7 +152,7 @@ helm install cilium cilium/cilium --version $CILIUM_VERSION \
   --set ipv6.enabled=false \
   --set ipv4.enabled=true
 
-# make sure the KUBECONFIG works when you sudo -i bash 
+# make sure the KUBECONFIG works when you sudo -i bash
 echo "export KUBECONFIG=/etc/kubernetes/admin.conf" >> /root/.bash_profile
 
 # attempt to scale down coredns
